@@ -150,22 +150,6 @@ function uploadCSV() {
     console.error(err);
   });
 }
-
-/* ---------------- Data Fetch ---------------- */
-function fetchData(callback) {
-  if (cachedData) {
-    callback(cachedData);
-    return;
-  }
-
-  fetch(`${API}/timeseries`)
-    .then(r => r.json())
-    .then(d => {
-      cachedData = d;
-      callback(d);
-    });
-}
-
 /* ---------------- Flow Plot ---------------- */
 function showFlowPlot() {
   fetchData(d => {
@@ -211,6 +195,35 @@ function showPowerPlot() {
       hovermode: "x unified"
     });
   });
+}
+/* ---------------- Data Fetch & Downsample ---------------- */
+function fetchData(callback) {
+  if (cachedData) {
+    callback(cachedData);
+    return;
+  }
+
+  fetch(`${API}/timeseries`)
+    .then(r => r.json())
+    .then(d => {
+      console.log("Data received:", d);
+      console.log("Original length:", d.Timestamp?.length);
+      
+      // Downsample to every 100th point (reduce 2.4M to ~24k points)
+      const downsample = 100;
+      const downsampled = {
+        Timestamp: d.Timestamp.filter((_, i) => i % downsample === 0),
+        HighFlowRAW: d.HighFlowRAW.filter((_, i) => i % downsample === 0),
+        LowFlowRAW: d.LowFlowRAW.filter((_, i) => i % downsample === 0),
+        ArgonFlowRAW: d.ArgonFlowRAW.filter((_, i) => i % downsample === 0),
+        Power_W: d.Power_W.filter((_, i) => i % downsample === 0)
+      };
+      
+      console.log("Downsampled length:", downsampled.Timestamp?.length);
+      cachedData = downsampled;
+      callback(downsampled);
+    })
+    .catch(err => console.error("Fetch error:", err));
 }
 </script>
 
