@@ -2,10 +2,12 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 import uuid, shutil, os
 
 from app.ingest import ingest_csv
 from app.queries import fetch_all_data
+from app.database import engine, TABLE_NAME  # Add this import
 
 app = FastAPI(title="Flow & Power Analytics Backend")
 
@@ -38,12 +40,24 @@ async def upload_csv(file: UploadFile = File(...)):
 @app.get("/timeseries")
 def get_timeseries():
     df = fetch_all_data()
+    
+    # Handle empty dataframe
+    if df.empty:
+        return {
+            "Timestamp": [],
+            "HighFlowRAW": [],
+            "LowFlowRAW": [],
+            "ArgonFlowRAW": [],
+            "Power_W": [],
+        }
+    
+    # Convert timestamps to ISO format strings for proper JSON serialization
     return {
-        "Timestamp": df["Timestamp"].tolist(),
-        "HighFlowRAW": df["HighFlowRAW"].tolist(),
-        "LowFlowRAW": df["LowFlowRAW"].tolist(),
-        "ArgonFlowRAW": df["ArgonFlowRAW"].tolist(),
-        "Power_W": df["Power_W"].tolist(),
+        "Timestamp": df["Timestamp"].dt.strftime('%Y-%m-%dT%H:%M:%S').tolist(),
+        "HighFlowRAW": df["HighFlowRAW"].fillna(0).tolist(),  # Replace NaN with 0
+        "LowFlowRAW": df["LowFlowRAW"].fillna(0).tolist(),
+        "ArgonFlowRAW": df["ArgonFlowRAW"].fillna(0).tolist(),
+        "Power_W": df["Power_W"].fillna(0).tolist(),
     }
 
 @app.get("/db-status")
