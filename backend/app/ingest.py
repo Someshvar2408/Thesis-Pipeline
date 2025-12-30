@@ -1,6 +1,5 @@
 
 from sqlalchemy import inspect, text
-from app.ingest import ingest_csv
 from app.queries import fetch_all_data
 from app.db import engine
 from app.config import TABLE_NAME
