@@ -7,7 +7,7 @@ import uuid, shutil, os
 
 from app.ingest import ingest_csv
 from app.queries import fetch_all_data
-from app.db import engine, TABLE_NAME  # Add this import
+from app.models import engine, TABLE_NAME  # Add this import
 
 app = FastAPI(title="Flow & Power Analytics Backend")
 
