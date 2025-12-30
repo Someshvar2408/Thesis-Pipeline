@@ -1,5 +1,6 @@
 from sqlalchemy import inspect, Table, Column, MetaData, Float, String
 from app.db import engine
+from app.config import TABLE_NAME
 
 def table_exists(table_name: str) -> bool:
     inspector = inspect(engine)
