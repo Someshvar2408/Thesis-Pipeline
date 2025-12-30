@@ -1,64 +1,217 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>DoE Run – Flow & Power Dashboard</title>
+
+  <!-- Plotly -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <!-- Minimal styling -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .section {
+      margin-bottom: 25px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: none;
+      background: #0066cc;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background: #004c99;
+    }
+
+    button.secondary {
+      background: #555;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .status.success {
+      color: green;
+    }
+
+    .status.error {
+      color: red;
+    }
+
+    .plot {
+      display: none;
+      margin-top: 20px;
+    }
+  </style>
 </head>
+
 <body>
+  <div class="container">
 
-<h2>Upload Flow CSV</h2>
-<input type="file" id="csv">
-<button onclick="upload()">Upload</button>
+    <h1>DoE Run – Flow & Power Dashboard</h1>
+    <p>Upload process logs and visualize sensor & power metrics</p>
 
-<hr>
+    <!-- CSV Upload Section -->
+    <div class="section">
+      <h3>1. Upload Flow CSV</h3>
+      <div class="controls">
+        <input type="file" id="csv" />
+        <button onclick="uploadCSV()">Upload CSV</button>
+      </div>
+      <div id="uploadStatus" class="status"></div>
+    </div>
 
-<h2>RAW Sensor Values</h2>
-<div id="flowPlot"></div>
+    <hr />
 
-<h2>Power Consumption</h2>
-<div id="powerPlot"></div>
+    <!-- Visualization Controls -->
+    <div class="section">
+      <h3>2. Visualizations</h3>
+      <div class="controls">
+        <button class="secondary" onclick="showFlowPlot()">Show RAW Sensor Values</button>
+        <button class="secondary" onclick="showPowerPlot()">Show Power Consumption</button>
+      </div>
+    </div>
+
+    <!-- Plots -->
+    <div id="flowPlot" class="plot"></div>
+    <div id="powerPlot" class="plot"></div>
+
+  </div>
 
 <script>
 const API = "http://localhost:10000";
+let cachedData = null;
 
-function upload() {
-  const file = document.getElementById("csv").files[0];
+/* ---------------- CSV Upload ---------------- */
+function uploadCSV() {
+  const fileInput = document.getElementById("csv");
+  const status = document.getElementById("uploadStatus");
+
+  if (!fileInput.files.length) {
+    status.textContent = "Please select a CSV file.";
+    status.className = "status error";
+    return;
+  }
+
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", fileInput.files[0]);
+
+  status.textContent = "Uploading CSV and processing data...";
+  status.className = "status";
 
   fetch(`${API}/upload-csv`, {
     method: "POST",
     body: fd
-  }).then(loadPlots);
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Upload failed");
+    return res.json();
+  })
+  .then(() => {
+    status.textContent = "CSV uploaded successfully. Table created/appended.";
+    status.className = "status success";
+    cachedData = null; // invalidate cache
+  })
+  .catch(err => {
+    status.textContent = "Error uploading CSV.";
+    status.className = "status error";
+    console.error(err);
+  });
 }
 
-function loadPlots() {
+/* ---------------- Data Fetch ---------------- */
+function fetchData(callback) {
+  if (cachedData) {
+    callback(cachedData);
+    return;
+  }
+
   fetch(`${API}/timeseries`)
     .then(r => r.json())
     .then(d => {
-
-      Plotly.newPlot("flowPlot", [
-        { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW" },
-        { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW" },
-        { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW" }
-      ], {
-        title: "RAW Sensor Values",
-        xaxis: { rangeslider: { visible: true }, type: "date" },
-        hovermode: "x unified"
-      });
-
-      Plotly.newPlot("powerPlot", [
-        { x: d.Timestamp, y: d.Power_W, name: "Power", mode: "lines" }
-      ], {
-        title: "Power Consumption Over Time",
-        xaxis: { rangeslider: { visible: true }, type: "date" },
-        yaxis: { title: "Power (W)" },
-        hovermode: "x unified"
-      });
+      cachedData = d;
+      callback(d);
     });
 }
 
-loadPlots();
+/* ---------------- Flow Plot ---------------- */
+function showFlowPlot() {
+  fetchData(d => {
+    document.getElementById("flowPlot").style.display = "block";
+
+    Plotly.newPlot("flowPlot", [
+      { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW" },
+      { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW" },
+      { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW" }
+    ], {
+      title: "RAW Gas Sensor Values",
+      xaxis: {
+        title: "Timestamp",
+        rangeslider: { visible: true },
+        type: "date"
+      },
+      yaxis: { title: "RAW Value" },
+      hovermode: "x unified"
+    });
+  });
+}
+
+/* ---------------- Power Plot ---------------- */
+function showPowerPlot() {
+  fetchData(d => {
+    document.getElementById("powerPlot").style.display = "block";
+
+    Plotly.newPlot("powerPlot", [
+      {
+        x: d.Timestamp,
+        y: d.Power_W,
+        name: "Power (W)",
+        mode: "lines"
+      }
+    ], {
+      title: "Power Consumption Over Time",
+      xaxis: {
+        title: "Timestamp",
+        rangeslider: { visible: true },
+        type: "date"
+      },
+      yaxis: { title: "Power (W)" },
+      hovermode: "x unified"
+    });
+  });
+}
 </script>
 
 </body>
