@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>DoE Run – Flow & Power Dashboard</title>
 
-  <!-- Plotly -->
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <!-- Plotly (latest) -->
+  <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
 
   <!-- Minimal styling -->
   <style>
@@ -16,9 +16,7 @@
       padding: 20px;
     }
 
-    h1 {
-      margin-bottom: 5px;
-    }
+    h1 { margin-bottom: 5px; }
 
     .container {
       max-width: 1100px;
@@ -29,9 +27,7 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
-    .section {
-      margin-bottom: 25px;
-    }
+    .section { margin-bottom: 25px; }
 
     .controls {
       display: flex;
@@ -49,26 +45,17 @@
       border-radius: 4px;
     }
 
-    button:hover {
-      background: #004c99;
-    }
+    button:hover { background: #004c99; }
 
-    button.secondary {
-      background: #555;
-    }
+    button.secondary { background: #555; }
 
     .status {
       margin-top: 10px;
       font-size: 14px;
     }
 
-    .status.success {
-      color: green;
-    }
-
-    .status.error {
-      color: red;
-    }
+    .status.success { color: green; }
+    .status.error { color: red; }
 
     .plot {
       display: none;
@@ -131,72 +118,24 @@ function uploadCSV() {
   status.textContent = "Uploading CSV and processing data...";
   status.className = "status";
 
-  fetch(`${API}/upload-csv`, {
-    method: "POST",
-    body: fd
-  })
-  .then(res => {
-    if (!res.ok) throw new Error("Upload failed");
-    return res.json();
-  })
-  .then(() => {
-    status.textContent = "CSV uploaded successfully. Table created/appended.";
-    status.className = "status success";
-    cachedData = null; // invalidate cache
-  })
-  .catch(err => {
-    status.textContent = "Error uploading CSV.";
-    status.className = "status error";
-    console.error(err);
-  });
-}
-/* ---------------- Flow Plot ---------------- */
-function showFlowPlot() {
-  fetchData(d => {
-    document.getElementById("flowPlot").style.display = "block";
-
-    Plotly.newPlot("flowPlot", [
-      { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW" },
-      { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW" },
-      { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW" }
-    ], {
-      title: "RAW Gas Sensor Values",
-      xaxis: {
-        title: "Timestamp",
-        rangeslider: { visible: true },
-        type: "date"
-      },
-      yaxis: { title: "RAW Value" },
-      hovermode: "x unified"
+  fetch(`${API}/upload-csv`, { method: "POST", body: fd })
+    .then(res => {
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    })
+    .then(() => {
+      status.textContent = "CSV uploaded successfully. Table created/appended.";
+      status.className = "status success";
+      cachedData = null; // invalidate cache
+    })
+    .catch(err => {
+      status.textContent = "Error uploading CSV.";
+      status.className = "status error";
+      console.error(err);
     });
-  });
 }
 
-/* ---------------- Power Plot ---------------- */
-function showPowerPlot() {
-  fetchData(d => {
-    document.getElementById("powerPlot").style.display = "block";
-
-    Plotly.newPlot("powerPlot", [
-      {
-        x: d.Timestamp,
-        y: d.Power_W,
-        name: "Power (W)",
-        mode: "lines"
-      }
-    ], {
-      title: "Power Consumption Over Time",
-      xaxis: {
-        title: "Timestamp",
-        rangeslider: { visible: true },
-        type: "date"
-      },
-      yaxis: { title: "Power (W)" },
-      hovermode: "x unified"
-    });
-  });
-}
-/* ---------------- Data Fetch & Downsample ---------------- */
+/* ---------------- Data Fetch ---------------- */
 function fetchData(callback) {
   if (cachedData) {
     callback(cachedData);
@@ -207,23 +146,45 @@ function fetchData(callback) {
     .then(r => r.json())
     .then(d => {
       console.log("Data received:", d);
-      console.log("Original length:", d.Timestamp?.length);
-      
-      // Downsample to every 100th point (reduce 2.4M to ~24k points)
-      const downsample = 100;
-      const downsampled = {
-        Timestamp: d.Timestamp.filter((_, i) => i % downsample === 0),
-        HighFlowRAW: d.HighFlowRAW.filter((_, i) => i % downsample === 0),
-        LowFlowRAW: d.LowFlowRAW.filter((_, i) => i % downsample === 0),
-        ArgonFlowRAW: d.ArgonFlowRAW.filter((_, i) => i % downsample === 0),
-        Power_W: d.Power_W.filter((_, i) => i % downsample === 0)
-      };
-      
-      console.log("Downsampled length:", downsampled.Timestamp?.length);
-      cachedData = downsampled;
-      callback(downsampled);
+      console.log("Length:", d.Timestamp?.length);
+      cachedData = d;   // no downsampling
+      callback(d);
     })
     .catch(err => console.error("Fetch error:", err));
+}
+
+/* ---------------- Flow Plot ---------------- */
+function showFlowPlot() {
+  fetchData(d => {
+    document.getElementById("flowPlot").style.display = "block";
+
+    Plotly.newPlot("flowPlot", [
+      { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW", mode: "lines", type: "scattergl" },
+      { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW", mode: "lines", type: "scattergl" },
+      { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW", mode: "lines", type: "scattergl" }
+    ], {
+      title: "RAW Gas Sensor Values",
+      xaxis: { title: "Timestamp", type: "date" },
+      yaxis: { title: "RAW Value" },
+      hovermode: "x unified"
+    }, { responsive: true });
+  });
+}
+
+/* ---------------- Power Plot ---------------- */
+function showPowerPlot() {
+  fetchData(d => {
+    document.getElementById("powerPlot").style.display = "block";
+
+    Plotly.newPlot("powerPlot", [
+      { x: d.Timestamp, y: d.Power_W, name: "Power (W)", mode: "lines", type: "scattergl" }
+    ], {
+      title: "Power Consumption Over Time",
+      xaxis: { title: "Timestamp", type: "date" },
+      yaxis: { title: "Power (W)" },
+      hovermode: "x unified"
+    }, { responsive: true });
+  });
 }
 </script>
 
