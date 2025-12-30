@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 import uuid, shutil, os
-
+import pandas as pd
 from app.ingest import ingest_csv
 from app.queries import fetch_all_data
 from app.models import engine, TABLE_NAME  # Add this import
@@ -50,6 +50,9 @@ def get_timeseries():
             "ArgonFlowRAW": [],
             "Power_W": [],
         }
+    
+    # Ensure Timestamp is datetime type
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"])
     
     # Convert timestamps to ISO format strings for proper JSON serialization
     return {
