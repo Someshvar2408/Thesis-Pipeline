@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DoE Run – Flow & Power Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+
+<h2>Upload Flow CSV</h2>
+<input type="file" id="csv">
+<button onclick="upload()">Upload</button>
+
+<hr>
+
+<h2>RAW Sensor Values</h2>
+<div id="flowPlot"></div>
+
+<h2>Power Consumption</h2>
+<div id="powerPlot"></div>
+
+<script>
+const API = "http://localhost:10000";
+
+function upload() {
+  const file = document.getElementById("csv").files[0];
+  const fd = new FormData();
+  fd.append("file", file);
+
+  fetch(`${API}/upload-csv`, {
+    method: "POST",
+    body: fd
+  }).then(loadPlots);
+}
+
+function loadPlots() {
+  fetch(`${API}/timeseries`)
+    .then(r => r.json())
+    .then(d => {
+
+      Plotly.newPlot("flowPlot", [
+        { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW" },
+        { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW" },
+        { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW" }
+      ], {
+        title: "RAW Sensor Values",
+        xaxis: { rangeslider: { visible: true }, type: "date" },
+        hovermode: "x unified"
+      });
+
+      Plotly.newPlot("powerPlot", [
+        { x: d.Timestamp, y: d.Power_W, name: "Power", mode: "lines" }
+      ], {
+        title: "Power Consumption Over Time",
+        xaxis: { rangeslider: { visible: true }, type: "date" },
+        yaxis: { title: "Power (W)" },
+        hovermode: "x unified"
+      });
+    });
+}
+
+loadPlots();
+</script>
+
+</body>
+</html>
