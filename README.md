@@ -2,7 +2,7 @@
 
 ## 🎯 What Has Been Set Up
 
-Your Thesis Pipeline application is now fully containerized and ready for Kubernetes deployment. Here's what has been created:
+This Thesis Pipeline application helps to visualize the resource consumption of an industrial metal 3D printer(gas flow, power, energy consumption). The data is collected using a standalone PLC architecture which sends data to a python script in the same subnet as the PLC. The application is now fully containerized and ready for Kubernetes deployment. Here's what has been created:
 
 ### Docker Configuration
 - **Backend Dockerfile** - Multi-stage build for FastAPI application (Python 3.11-slim)
