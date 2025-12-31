@@ -60,6 +60,7 @@
     .plot {
       display: none;
       margin-top: 20px;
+      min-height: 500px;
     }
   </style>
 </head>
@@ -156,34 +157,146 @@ function fetchData(callback) {
 /* ---------------- Flow Plot ---------------- */
 function showFlowPlot() {
   fetchData(d => {
-    document.getElementById("flowPlot").style.display = "block";
+    const flowDiv = document.getElementById("flowPlot");
+    flowDiv.style.display = "block";
 
-    Plotly.newPlot("flowPlot", [
-      { x: d.Timestamp, y: d.HighFlowRAW, name: "HighFlowRAW", mode: "lines", type: "scattergl" },
-      { x: d.Timestamp, y: d.LowFlowRAW, name: "LowFlowRAW", mode: "lines", type: "scattergl" },
-      { x: d.Timestamp, y: d.ArgonFlowRAW, name: "ArgonFlowRAW", mode: "lines", type: "scattergl" }
-    ], {
-      title: "RAW Gas Sensor Values",
-      xaxis: { title: "Timestamp", type: "date" },
-      yaxis: { title: "RAW Value" },
-      hovermode: "x unified"
-    }, { responsive: true });
+    const traces = [
+      { 
+        x: d.Timestamp, 
+        y: d.HighFlowRAW, 
+        name: "HighFlowRAW", 
+        mode: "lines", 
+        type: "scatter",
+        line: { width: 2 },
+        hovertemplate: "<b>HighFlowRAW</b><br>Timestamp: %{x}<br>Value: %{y:.2f}<extra></extra>"
+      },
+      { 
+        x: d.Timestamp, 
+        y: d.LowFlowRAW, 
+        name: "LowFlowRAW", 
+        mode: "lines", 
+        type: "scatter",
+        line: { width: 2 },
+        hovertemplate: "<b>LowFlowRAW</b><br>Timestamp: %{x}<br>Value: %{y:.2f}<extra></extra>"
+      },
+      { 
+        x: d.Timestamp, 
+        y: d.ArgonFlowRAW, 
+        name: "ArgonFlowRAW", 
+        mode: "lines", 
+        type: "scatter",
+        line: { width: 2 },
+        hovertemplate: "<b>ArgonFlowRAW</b><br>Timestamp: %{x}<br>Value: %{y:.2f}<extra></extra>"
+      }
+    ];
+
+    const layout = {
+      title: { text: "RAW Gas Sensor Values", font: { size: 18 } },
+      xaxis: { 
+        title: { text: "Timestamp", font: { size: 14, color: "#000" } },
+        type: "date",
+        showgrid: true,
+        gridwidth: 1,
+        gridcolor: "#e0e0e0",
+        zeroline: false,
+        tickfont: { size: 11, color: "#000" }
+      },
+      yaxis: { 
+        title: { text: "RAW Value", font: { size: 14, color: "#000" } },
+        showgrid: true,
+        gridwidth: 1,
+        gridcolor: "#e0e0e0",
+        zeroline: false,
+        tickfont: { size: 11, color: "#000" }
+      },
+      hovermode: "x unified",
+      showlegend: true,
+      legend: {
+        x: 1.02,
+        y: 1,
+        xanchor: 'left',
+        yanchor: 'top',
+        bgcolor: 'rgba(255, 255, 255, 0.8)',
+        bordercolor: '#000',
+        borderwidth: 1
+      },
+      plot_bgcolor: "rgba(240, 240, 240, 0.5)",
+      width: 1200,
+      height: 550,
+      margin: { l: 100, r: 120, t: 100, b: 100 }
+    };
+
+    const config = { 
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+
+    Plotly.newPlot(flowDiv, traces, layout, config);
   });
 }
 
 /* ---------------- Power Plot ---------------- */
 function showPowerPlot() {
   fetchData(d => {
-    document.getElementById("powerPlot").style.display = "block";
+    const powerDiv = document.getElementById("powerPlot");
+    powerDiv.style.display = "block";
 
-    Plotly.newPlot("powerPlot", [
-      { x: d.Timestamp, y: d.Power_W, name: "Power (W)", mode: "lines", type: "scattergl" }
-    ], {
-      title: "Power Consumption Over Time",
-      xaxis: { title: "Timestamp", type: "date" },
-      yaxis: { title: "Power (W)" },
-      hovermode: "x unified"
-    }, { responsive: true });
+    const traces = [
+      { 
+        x: d.Timestamp, 
+        y: d.Power_W, 
+        name: "Power (W)", 
+        mode: "lines", 
+        type: "scatter",
+        line: { width: 2, color: '#ff7f0e' },
+        hovertemplate: "<b>Power Consumption</b><br>Timestamp: %{x}<br>Power: %{y:.2f} W<extra></extra>"
+      }
+    ];
+
+    const layout = {
+      title: { text: "Power Consumption Over Time", font: { size: 18 } },
+      xaxis: { 
+        title: { text: "Timestamp", font: { size: 14, color: "#000" } },
+        type: "date",
+        showgrid: true,
+        gridwidth: 1,
+        gridcolor: "#e0e0e0",
+        zeroline: false,
+        tickfont: { size: 11, color: "#000" }
+      },
+      yaxis: { 
+        title: { text: "Power (W)", font: { size: 14, color: "#000" } },
+        showgrid: true,
+        gridwidth: 1,
+        gridcolor: "#e0e0e0",
+        zeroline: false,
+        tickfont: { size: 11, color: "#000" }
+      },
+      hovermode: "x unified",
+      showlegend: true,
+      legend: {
+        x: 1.02,
+        y: 1,
+        xanchor: 'left',
+        yanchor: 'top',
+        bgcolor: 'rgba(255, 255, 255, 0.8)',
+        bordercolor: '#000',
+        borderwidth: 1
+      },
+      plot_bgcolor: "rgba(240, 240, 240, 0.5)",
+      width: 1200,
+      height: 550,
+      margin: { l: 100, r: 120, t: 100, b: 100 }
+    };
+
+    const config = { 
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+
+    Plotly.newPlot(powerDiv, traces, layout, config);
   });
 }
 </script>

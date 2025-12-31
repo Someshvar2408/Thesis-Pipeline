@@ -38,7 +38,13 @@ async def upload_csv(file: UploadFile = File(...)):
     return {"rows_inserted": rows}
 
 @app.get("/timeseries")
-def get_timeseries():
+def get_timeseries(max_points: int = 10000):
+    """
+    Fetch timeseries data with intelligent downsampling.
+    
+    Args:
+        max_points: Maximum number of data points to return (default: 10000)
+    """
     df = fetch_all_data()
     
     # Handle empty dataframe
@@ -53,6 +59,15 @@ def get_timeseries():
     
     # Ensure Timestamp is datetime type
     df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+    
+    # Sort by timestamp
+    df = df.sort_values("Timestamp")
+    
+    # Downsample if dataset is too large
+    if len(df) > max_points:
+        # Use systematic sampling to reduce data points
+        step = len(df) // max_points
+        df = df.iloc[::step].copy()
     
     # Convert timestamps to ISO format strings for proper JSON serialization
     return {
