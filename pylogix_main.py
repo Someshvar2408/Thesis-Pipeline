@@ -7,15 +7,16 @@ import shutil  # NEW
 
 
 # ---------------- CONFIG ----------------
-PLC_IP = "130.233.65.131"
+PLC_IP = "Your PLC's IP" #Make sure your PLC and the device that runs this script are in the same subnet
 
 # Unique CSV file per run for logging
 LOG_FILE = datetime.datetime.now().strftime("FlowLog_%Y%m%d_%H%M%S.csv")
 
 POLL_INTERVAL = 1  # seconds
-FTP_HOST = "130.233.65.130"
-FTP_USER = "addlab"
-FTP_PASS = "12345678"
+#If you have FTP server access, include the details to upload to your FTP server for backup.
+FTP_HOST = "HOST IP"
+FTP_USER = "Username"
+FTP_PASS = "Password"
 UPLOAD_TO_FTP = False  # Upload a COPY when script stops
 
 
@@ -114,3 +115,4 @@ with PLC() as plc:
         # Upload a stable snapshot at the end; LOG_FILE itself is never touched by FTP
         if UPLOAD_TO_FTP:
             upload_log_copy()
+
