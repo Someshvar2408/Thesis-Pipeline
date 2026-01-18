@@ -274,8 +274,10 @@ Given the **very small number of calibration samples**, linear regression is a b
 
 - Collect more calibration points across low, medium, and high flow regimes.
 - Experiment with polynomial regression (e.g., quadratic) if residuals show systematic non‑linearity.
-- Include temperature, pressure, or other process variables as additional features if they influence sensor behavior.
 - Periodically retrain models on updated calibration datasets to handle sensor drift.
+- Implement another machine learning model to predict the resource consumption data (ArgonFlow_LMin, LowFlow_LMin, HighFlow_LMin, Power_W, Energy_kWh) from input features fed from proprietary machine software data parameters like Laser power, scan speed, hatch distance, material used, shielding gas used.
+- Note that the proprietary machine software data has some bugs related to timestamp specification of the layer-wise and part-wise information of the 3D printing process and to acquire more intricate data or APIs a subscription is required.
+- However a conceptual machine learning model can be build, which can be trained and optimized in the future if the proprietary machine subscription is acquired.
 
 ---
 
