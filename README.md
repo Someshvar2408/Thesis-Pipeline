@@ -2,7 +2,15 @@
 
 ## 🎯 What Has Been Set Up
 
-This Thesis Pipeline application helps to visualize the resource consumption of an industrial metal 3D printer(gas flow, power, energy consumption). The data is collected using a standalone PLC architecture which sends data to a python script in the same subnet as the PLC. The application is now fully containerized and ready for Kubernetes deployment. Here's what has been created:
+- This Thesis Pipeline application helps to visualize the resource consumption of an industrial metal 3D printer(gas flow, power, energy consumption). The data is collected using a standalone PLC architecture which sends data to a python script in the same subnet as the PLC. The application is now fully containerized and ready for Kubernetes deployment.
+
+- A standalone PLC (OMRON NX1P2-9B24DT1) architecture is connected to proprietary gas flow sensors  and power meter (SMC's • PF2M725S-C6-L3-S: Compressed gas (Low Flow) sensor • PF2M721S-N2-L3: Argon Flow sensor • PF3A703H-F10-L3: Compressed gas (High Flow) sensor  •Carlo Gavazzi EM 340 S1 power meter). The PLC is configured with sensors in Sysmac Studio Program and made sure it sends data over ethernet to the data logging script **pylogix_main.py**.
+
+- The Python logging script **pylogix_main.py**  pings the PLC's IP address to collect the data attributes like : Timestamp, HighFlow, HighFlowRAW, LowFlow, LowFlowRAW, ArgonFlow, ArgonFlowRAW, Energy_kWh, Power_W
+
+- The accuracy of the analog flow sensors is not captured by a linear formula, so a machine learning model is used to capture the non-linear nature of the RAW values which is used to calibrate the sensors based on a manually noted RAW Values and their corresponding sensor output values is used to train a machine learning model **ML(1).ipynb**. 
+
+
 
 ### Docker Configuration
 - **Backend Dockerfile** - Multi-stage build for FastAPI application (Python 3.11-slim)
