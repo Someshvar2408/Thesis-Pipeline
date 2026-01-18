@@ -10,6 +10,149 @@
 
 - The accuracy of the analog flow sensors is not captured by a linear formula, so a machine learning model is used to capture the non-linear nature of the RAW values which is used to calibrate the sensors based on a manually noted RAW Values and their corresponding sensor output values is used to train a machine learning model **ML(1).ipynb**. 
 
+# Sensor Flow Calibration using Linear Regression
+
+This project implements a simple, interpretable machine learning model to improve the calibration of industrial flow sensors. The model learns a mapping from raw sensor values (as seen by the PLC) to accurate flow rates in L/min using a small, high‑quality calibration dataset and then applies this mapping to a larger set of logged operational data.
+
+---
+
+## 1. Overview
+
+In the existing system, the PLC converts raw analog sensor values to flow rates using a fixed linear formula. This formula is approximate and introduces systematic errors, especially outside the nominal calibration points. To address this, a supervised regression model (linear regression) is trained on calibration data consisting of:
+
+- Raw sensor values (input feature)
+- Manually measured flow values in L/min (ground truth)
+
+The trained model is then used to compute corrected flow values for all records in the PLC log.
+
+The approach is applied separately to three flow sensors:
+
+- `LowFlow`
+- `ArgonFlow`
+- `HighFlow`
+
+Each sensor receives its own regression model and corresponding corrected flow column in the output CSV.
+
+---
+
+## 2. Data Description
+
+### 2.1 Calibration Data
+
+**File:** `Sensor_Calibration(Sheet1).csv`  
+**Purpose:** Ground truth for training the regression models.
+
+Expected columns:
+
+- `SensorType`: Categorical identifier of the sensor (e.g., `"LowFlow"`, `"ArgonFlow"`, `"HighFlow"`).
+- `RAW_value`: Raw sensor reading as recorded during calibration (e.g., ADC counts or scaled analog value).
+- `Flow_Lmin`: Manually measured true flow in L/min corresponding to `RAW_value`.
+
+Each sensor type typically has about 5 calibration points spanning its operating range.
+
+### 2.2 Operational (PLC Log) Data
+
+**File:** `FlowLog_20251215_095220.csv`  
+**Purpose:** Unlabeled operational data to which the learned calibration is applied.
+
+Expected columns (minimum):
+
+- `Timestamp`: Time of the log entry (parsed as datetime).
+- `LowFlowRAW`: Raw reading for the low‑flow sensor.
+- `ArgonFlowRAW`: Raw reading for the argon flow sensor.
+- `HighFlowRAW`: Raw reading for the high‑flow sensor.
+- Existing PLC‑computed flow columns (e.g., `LowFlow`, `ArgonFlow`, `HighFlow`), if available, are not used as targets but may be retained for comparison.
+
+### 2.3 Output Data
+
+**File (generated):** `plc_operational_data_with_corrected_flows.csv`  
+
+This file contains all original columns from the PLC log plus the following corrected flow columns:
+
+- `LowFlow_Lmin`
+- `ArgonFlow_Lmin`
+- `HighFlow_Lmin`
+
+These columns are the model‑predicted calibrated flows in L/min based on the trained regression models.
+
+---
+
+## 3. Model Description
+
+### 3.1 Problem Formulation
+
+For each sensor type, calibration is treated as a univariate regression problem:
+
+- Input feature: raw sensor value \( x_{\text{raw}} \)
+- Target label: true flow in L/min \( y_{\text{true}} \)
+
+The goal is to learn a function
+\[
+\hat{y} = f(x_{\text{raw}})
+\]
+that approximates the true flow across the sensor’s operating range.
+
+### 3.2 Model Choice
+
+The model used is **ordinary least squares (OLS) linear regression**:
+
+\[
+\hat{y} = w_1 \cdot x_{\text{raw}} + w_0,
+\]
+
+where:
+
+- \( w_1 \) is the learned gain (sensitivity),
+- \( w_0 \) is the learned offset.
+
+**Rationale:**
+
+- The calibration dataset is very small (about 5 points per sensor).
+- Linear regression has only two parameters and is robust with small sample sizes.
+- The fitted line is easy to interpret and implement (e.g., directly in PLC logic).
+- Many flow sensors behave approximately linearly over their intended operating range.
+
+---
+
+## 4. Code Structure
+
+The core workflow can be summarized as:
+
+1. Load PLC operational data.
+2. Load calibration data.
+3. For each sensor type:
+   - Subset calibration data.
+   - Train a linear regression model using `RAW_value` → `Flow_Lmin`.
+   - Apply the model to the corresponding raw column in the PLC log.
+4. Save the PLC log with additional calibrated flow columns.
+
+### 4.1 Loading Data
+
+```python
+import pandas as pd
+from pathlib import Path
+from sklearn.linear_model import LinearRegression
+
+BASE_DIR = Path.cwd()
+DATA_DIR = BASE_DIR
+
+INPUT_PLC_CSV = DATA_DIR / "FlowLog_20251215_095220.csv"
+INPUT_CALIB_CSV = DATA_DIR / "Sensor_Calibration(Sheet1).csv"
+OUTPUT_CSV = DATA_DIR / "plc_operational_data_with_corrected_flows.csv"
+
+def load_operational_data(path):
+    df = pd.read_csv(path)
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+    df = df.sort_values("Timestamp").reset_index(drop=True)
+    return df
+
+def load_calibration_data(path):
+    # expected columns: SensorType, RAW_value, Flow_Lmin
+    return pd.read_csv(path)
+
+plc_df = load_operational_data(INPUT_PLC_CSV)
+calib_df = load_calibration_data(INPUT_CALIB_CSV)
+```
 
 
 ### Docker Configuration
