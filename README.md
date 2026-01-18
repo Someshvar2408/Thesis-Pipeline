@@ -12,13 +12,13 @@
 
 # Sensor Flow Calibration using Linear Regression
 
-This project implements a simple, interpretable machine learning model to improve the calibration of industrial flow sensors. The model learns a mapping from raw sensor values (as seen by the PLC) to accurate flow rates in L/min using a small, high‑quality calibration dataset and then applies this mapping to a larger set of logged operational data.
+The following section implements a simple, interpretable machine learning model to improve the calibration of industrial flow sensors. The model learns a mapping from raw sensor values (as seen by the PLC) to accurate flow rates in L/min using a small, high‑quality calibration dataset and then applies this mapping to a larger set of logged operational data.
 
 ---
 
 ## 1. Overview
 
-In the existing system, the PLC converts raw analog sensor values to flow rates using a fixed linear formula. This formula is approximate and introduces systematic errors, especially outside the nominal calibration points. To address this, a supervised regression model (linear regression) is trained on calibration data consisting of:
+In the existing system, the PLC converts raw analog sensor values to flow rates using a fixed linear formula. This formula is approximate and introduces systematic errors, especially outside the nominal calibration points. To address this, a supervised regression model is trained on calibration data consisting of:
 
 - Raw sensor values (input feature)
 - Manually measured flow values in L/min (ground truth)
@@ -45,10 +45,10 @@ Each sensor receives its own regression model and corresponding corrected flow c
 Expected columns:
 
 - `SensorType`: Categorical identifier of the sensor (e.g., `"LowFlow"`, `"ArgonFlow"`, `"HighFlow"`).
-- `RAW_value`: Raw sensor reading as recorded during calibration (e.g., ADC counts or scaled analog value).
+- `RAW_value`: Raw sensor reading as recorded during calibration.
 - `Flow_Lmin`: Manually measured true flow in L/min corresponding to `RAW_value`.
 
-Each sensor type typically has about 5 calibration points spanning its operating range.
+Each sensor type typically has **about 5 calibration points** spanning its operating range.
 
 ### 2.2 Operational (PLC Log) Data
 
@@ -57,23 +57,23 @@ Each sensor type typically has about 5 calibration points spanning its operating
 
 Expected columns (minimum):
 
-- `Timestamp`: Time of the log entry (parsed as datetime).
+- `Timestamp`: Time of the log entry.
 - `LowFlowRAW`: Raw reading for the low‑flow sensor.
 - `ArgonFlowRAW`: Raw reading for the argon flow sensor.
 - `HighFlowRAW`: Raw reading for the high‑flow sensor.
-- Existing PLC‑computed flow columns (e.g., `LowFlow`, `ArgonFlow`, `HighFlow`), if available, are not used as targets but may be retained for comparison.
+- Existing PLC‑computed flow columns (e.g., `LowFlow`, `ArgonFlow`, `HighFlow`) may exist and are retained for comparison, but are **not** used as ground‑truth labels.
 
 ### 2.3 Output Data
 
 **File (generated):** `plc_operational_data_with_corrected_flows.csv`  
 
-This file contains all original columns from the PLC log plus the following corrected flow columns:
+Contains all original PLC log columns plus calibrated flow columns:
 
 - `LowFlow_Lmin`
 - `ArgonFlow_Lmin`
 - `HighFlow_Lmin`
 
-These columns are the model‑predicted calibrated flows in L/min based on the trained regression models.
+These are the model‑predicted calibrated flows in L/min.
 
 ---
 
@@ -86,15 +86,15 @@ For each sensor type, calibration is treated as a univariate regression problem:
 - Input feature: raw sensor value \( x_{\text{raw}} \)
 - Target label: true flow in L/min \( y_{\text{true}} \)
 
-The goal is to learn a function
+Objective:
 \[
 \hat{y} = f(x_{\text{raw}})
 \]
-that approximates the true flow across the sensor’s operating range.
+where \( \hat{y} \) is the calibrated flow prediction.
 
-### 3.2 Model Choice
+### 3.2 Final Model: Linear Regression
 
-The model used is **ordinary least squares (OLS) linear regression**:
+The production model used is **ordinary least squares (OLS) linear regression**:
 
 \[
 \hat{y} = w_1 \cdot x_{\text{raw}} + w_0,
@@ -102,29 +102,19 @@ The model used is **ordinary least squares (OLS) linear regression**:
 
 where:
 
-- \( w_1 \) is the learned gain (sensitivity),
-- \( w_0 \) is the learned offset.
+- \( w_1 \) is the learned gain (slope),
+- \( w_0 \) is the learned offset (intercept).
 
-**Rationale:**
+**Why this model:**
 
-- The calibration dataset is very small (about 5 points per sensor).
-- Linear regression has only two parameters and is robust with small sample sizes.
-- The fitted line is easy to interpret and implement (e.g., directly in PLC logic).
-- Many flow sensors behave approximately linearly over their intended operating range.
+- Extremely **low capacity** (only two parameters per sensor) – ideal for very small calibration datasets.
+- Coefficients are **physically interpretable** as gain and offset corrections.
+- Closed‑form solution; easy to implement directly in PLC logic or any processing pipeline.
+- Matches the typical approximately linear behavior of many industrial flow sensors over their calibrated range.
 
 ---
 
 ## 4. Code Structure
-
-The core workflow can be summarized as:
-
-1. Load PLC operational data.
-2. Load calibration data.
-3. For each sensor type:
-   - Subset calibration data.
-   - Train a linear regression model using `RAW_value` → `Flow_Lmin`.
-   - Apply the model to the corresponding raw column in the PLC log.
-4. Save the PLC log with additional calibrated flow columns.
 
 ### 4.1 Loading Data
 
@@ -154,6 +144,146 @@ plc_df = load_operational_data(INPUT_PLC_CSV)
 calib_df = load_calibration_data(INPUT_CALIB_CSV)
 ```
 
+### 4.2 Training Per‑Sensor Linear Models
+
+```python
+def train_linear_sensor(cal_df, sensor_name):
+    df = cal_df[cal_df["SensorType"] == sensor_name].copy()
+
+    X = df[["RAW_value"]].values        # raw feature
+    y = df["Flow_Lmin"].values          # true flow (L/min)
+
+    model = LinearRegression()
+    model.fit(X, y)
+    return model
+```
+
+### 4.3 Applying Models to Operational Data
+
+```python
+def apply_all_sensor_models(plc_df, calib_df):
+
+    sensor_specs = [
+        ("LowFlow",  "LowFlowRAW",  "LowFlow_Lmin"),
+        ("ArgonFlow","ArgonFlowRAW","ArgonFlow_Lmin"),
+        ("HighFlow", "HighFlowRAW", "HighFlow_Lmin"),
+    ]
+
+    for sensor_name, raw_col, out_col in sensor_specs:
+        print(f"Training linear model for {sensor_name} sensor")
+        model = train_linear_sensor(calib_df, sensor_name)
+
+        # Predict calibrated flow for each operational row
+        plc_df[out_col] = model.predict(plc_df[[raw_col]].values)
+
+    return plc_df
+
+plc_df = apply_all_sensor_models(plc_df, calib_df)
+plc_df.to_csv(OUTPUT_CSV, index=False)
+print("Corrected CSV saved to:", OUTPUT_CSV)
+```
+
+---
+
+## 5. Model Comparison
+
+Two approaches were tested for mapping raw sensor values to calibrated flow:
+
+1. **Linear Regression (final choice)**
+2. **LightGBM Gradient Boosting Regressor (`LGBMRegressor`)** as an initial, more flexible candidate
+
+### 5.1 Initial Attempt: LightGBM (`LGBMRegressor`)
+
+A gradient‑boosted tree model was first explored using `lightgbm.LGBMRegressor`, with parameters such as:
+
+- `n_estimators=800`
+- `learning_rate=0.04`
+- `max_depth=5`
+- `monotone_constraints=[1, 1]`
+- TimeSeriesSplit cross‑validation
+
+Conceptually, gradient boosting is powerful for capturing complex non‑linear relationships in data and is widely used for regression tasks.[web:70][web:66] However, in this project it **did not perform well** and produced almost constant predictions across all samples for each sensor (e.g., the same L/min value repeated for all rows).
+
+**Reasons it failed in this context:**
+
+- **Extremely small calibration sample size**  
+  Each sensor had only ~5 calibration points. Gradient boosting methods are high‑capacity, non‑parametric models that typically require tens to hundreds (or more) samples to reliably learn meaningful structure without collapsing or overfitting.[web:65][web:66]
+
+- **Over‑parameterization relative to data**  
+  With `n_estimators=800` and `max_depth=5`, the LightGBM model had far more degrees of freedom than the number of data points. In such regimes, boosting can either overfit noise or fail to find informative splits, resulting in trivial models that default to predicting something close to the mean of the training targets.[web:60][web:66]
+
+- **Cross‑validation on almost no data**  
+  Using `TimeSeriesSplit(n_splits=5)` on just 5 points means some folds contained 1 or 2 training samples. Tree‑based learners have difficulty building meaningful trees from such tiny subsets, again pushing the model toward near‑constant predictions and unstable behavior.[web:53][web:65]
+
+- **Use of non‑ground‑truth labels in the original hybrid idea**  
+  In early code, operational PLC‑computed flows (from an inaccurate formula) were inadvertently mixed as targets along with true calibration labels, with only sample‑weighting to favor calibration points. This effectively taught the model to reproduce the old (incorrect) PLC formula on most rows, weakening the influence of the true calibration anchors.
+
+These issues are all symptoms of a mismatch between **model capacity** and **available labeled data**: high‑flexibility models like gradient boosting are not appropriate with such limited calibration samples.[web:65][web:71]
+
+### 5.2 Why Linear Regression Worked Better
+
+In contrast, **linear regression** performed well despite the small dataset:
+
+- **Very low complexity**  
+  Each sensor model has only **two parameters** (slope and intercept). This matches the data regime (5 points) far better than a large ensemble of trees. Theory and practice both indicate that with small sample sizes, low‑capacity models generalize more reliably than flexible ones.[web:65][web:59]
+
+- **Approximate linearity of physical sensors**  
+  Many industrial flow sensors have an approximately linear transfer function over their operating range, with deviations mainly in gain and offset. A straight line is therefore a reasonable model for the underlying physics, especially when only a few calibration points are available.[web:59]
+
+- **Stable behavior and no collapse to constants**  
+  OLS on 5 points always produces a definite line through the data, not a constant. As long as the calibration points are reasonably spread out, the fitted line yields distinct predictions across the raw value range and corrects the PLC’s approximate formula.
+
+- **Interpretability and deployment simplicity**  
+  The learned parameters can be directly implemented in PLC logic as:
+  \[
+  \text{Flow\_Lmin} = \hat{w}_1 \cdot \text{Raw} + \hat{w}_0,
+  \]
+  with no dependency on external libraries or complex runtime dependencies.
+
+**Conclusion of comparison:**  
+Given the **very small number of calibration samples**, linear regression is a better match for this problem than a high‑capacity ensemble model like LightGBM. Once more calibration data are collected (e.g., 15–20+ points per sensor spanning the full range), more flexible models such as LightGBM or polynomial regression could be revisited and compared under proper validation.[web:65][web:68]
+
+---
+
+## 6. How to Run
+
+1. Place the following files in the same directory as the script:
+   - `FlowLog_20251215_095220.csv`
+   - `Sensor_Calibration(Sheet1).csv`
+2. Install Python and required packages:
+   - `pandas`
+   - `scikit-learn`
+3. Run the script, for example:
+   ```bash
+   python ML(1).ipynb
+   ```
+4. Inspect the generated `plc_operational_data_with_corrected_flows.csv` for calibrated flow values.
+
+---
+
+## 7. Assumptions and Limitations
+
+- **Linearity:** The model assumes the relationship between raw sensor values and flow is adequately described by a straight line within the calibration range.
+- **Limited Calibration Points:** With ~5 calibration points per sensor, the model cannot robustly detect or fit subtle non‑linearities.
+- **Extrapolation:** Predictions outside the calibrated raw range are linear extrapolations and may be unreliable.
+- **Per‑Sensor Independence:** Each sensor is calibrated independently; cross‑sensor dependencies are not modeled.
+
+---
+
+## 8. Possible Extensions
+
+- Collect more calibration points across low, medium, and high flow regimes.
+- Experiment with polynomial regression (e.g., quadratic) if residuals show systematic non‑linearity.
+- Include temperature, pressure, or other process variables as additional features if they influence sensor behavior.
+- Periodically retrain models on updated calibration datasets to handle sensor drift.
+
+---
+
+## 9. Summary
+
+This section demonstrates a lightweight, interpretable machine learning solution for sensor calibration using linear regression. Although a more complex LightGBM model was initially considered, it under‑performed in this small‑sample setting and tended toward constant predictions. A simple linear model proved more robust, better aligned with the data size and physical intuition of the sensors, and easier to deploy in an industrial PLC environment.[web:59][web:65][web:66]
+
+# Containerization and Deployment
 
 ### Docker Configuration
 - **Backend Dockerfile** - Multi-stage build for FastAPI application (Python 3.11-slim)
