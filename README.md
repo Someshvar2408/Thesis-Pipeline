@@ -8,7 +8,15 @@
 
 - The Python logging script **pylogix_main.py**  pings the PLC's IP address to collect the data attributes like : Timestamp, HighFlow, HighFlowRAW, LowFlow, LowFlowRAW, ArgonFlow, ArgonFlowRAW, Energy_kWh, Power_W
 
-- The accuracy of the analog flow sensors is not captured by a linear formula, so a machine learning model is used to capture the non-linear nature of the RAW values which is used to calibrate the sensors based on a manually noted RAW Values and their corresponding sensor output values is used to train a machine learning model **ML(1).ipynb**. 
+- The accuracy of the analog flow sensors is not captured by a linear formula, so a machine learning model is used to capture the non-linear nature of the RAW values which is used to calibrate the sensors based on a manually noted RAW Values and their corresponding sensor output values is used to train a machine learning model **A-ML.ipynb**.
+  
+- The repository has three Python-based Jupyter Notebooks developed as part of the data logging and analysis framework for a Powder Bed Fusion (PBF) additive manufacturing thesis.
+  
+- The first notebook, A-PBF_Build_Comparison_v2.ipynb, implements phase-wise segmentation of two complete PBF build runs by extracting and visualising gas sensor (ArgonFlowRAW, LowFlowRAW, HighFlowRAW) and laser power (Power_W) data from a SQLite database. It automatically detects the post-processing phase using a rolling-median threshold algorithm applied to the HighFlowRAW signal, and generates interactive Plotly figures for the purge, exposure, and post-processing phases of each run.
+  
+- The second notebook, A-LayerSegmentation.ipynb, performs layer-wise segmentation by reconstructing and synchronising timestamps from the machine's part statistics export with the sensor data log, merging them via an inner join on timestamp, and producing dual-axis visualisations that map laser power fluctuations to individual layer indices using vertical band overlays and peak/valley detection.
+
+- The third notebook, A-ML.ipynb, implements a machine learning pipeline to convert raw ADC sensor readings into calibrated gas flow values in litres per minute. A Linear Regression model is trained independently for each of the three flow sensors using laboratory calibration reference points, evaluated on held-out test data using RMSE, MAE, R², and a ±5% tolerance-based classification metric, and subsequently applied to the full operational dataset to produce corrected flow values. The corrected flows are then used to compute argon and shielding gas consumption via trapezoidal numerical integration and energy consumption from cumulative meter readings, enabling quantitative comparison of resource usage across build phases and runs.
 
 # Sensor Flow Calibration using Linear Regression
 
@@ -284,6 +292,205 @@ Given the **very small number of calibration samples**, linear regression is a b
 ## 9. Summary
 
 This section demonstrates a lightweight, interpretable machine learning solution for sensor calibration using linear regression. Although a more complex LightGBM model was initially considered, it under‑performed in this small‑sample setting and tended toward constant predictions. A simple linear model proved more robust, better aligned with the data size and physical intuition of the sensors, and easier to deploy in an industrial PLC environment.[web:59][web:65][web:66]
+
+
+
+---
+
+# 🏗️ System Architecture
+
+## 🏗️ Architecture Diagram
+
+![System Architecture](docs/images/architecture)
+
+## High-Level Overview
+
+The system is designed as a **scalable, cloud-native data ingestion and visualization pipeline** for time-series sensor and power consumption data.
+
+### Core Components
+
+* **Web Client (Browser)**
+* **Amazon API Gateway**
+* **Kubernetes Cluster (Amazon EKS)**
+* **Amazon S3 (Object Storage)**
+* **AWS Lambda (Serverless Processing)**
+* **Relational Database (Amazon RDS / Aurora)**
+
+---
+
+## 🌐 Web Client Layer
+
+The web client provides the user-facing interface accessible via a browser.
+
+### Responsibilities:
+
+* Upload CSV files containing sensor and power data
+* Request stored datasets for visualization
+* Render interactive time-series graphs and analytics
+
+All communication with the backend occurs via **HTTPS REST APIs** through API Gateway.
+
+---
+
+## 🚪 API Management Layer (API Gateway)
+
+Acts as the **entry point** to the backend system.
+
+### Key Functions:
+
+* Routes incoming HTTP requests to backend services
+* Secures and manages API endpoints
+* Abstracts internal infrastructure from external users
+
+> Internal services (Kubernetes, database) are never directly exposed.
+
+---
+
+## ⚙️ Application Layer (Kubernetes – Amazon EKS)
+
+Backend services are deployed as **Docker containers** orchestrated using Kubernetes.
+
+### Responsibilities:
+
+* Handle CSV upload requests
+* Forward files to S3 for storage
+* Query database for visualization requests
+* Return structured JSON responses to frontend
+
+### Benefits:
+
+* Scalability
+* Fault tolerance
+* Service discovery
+* Reproducibility via containerization
+
+---
+
+## 📦 Data Ingestion Layer (Amazon S3)
+
+S3 acts as the **raw data landing zone**.
+
+### Why S3?
+
+* Durable storage of original CSV datasets
+* Enables traceability and reproducibility
+* Supports event-driven workflows
+
+> Uploading a file to S3 triggers downstream processing automatically.
+
+---
+
+## ⚡ Serverless Processing (AWS Lambda)
+
+Lambda enables **event-driven data ingestion**.
+
+### Workflow:
+
+1. File uploaded to S3
+2. S3 triggers Lambda
+3. Lambda processes the file
+
+### Responsibilities:
+
+* Read CSV from S3
+* Validate schema and structure
+* Parse time-series sensor data
+* Insert structured data into database
+
+### Advantages:
+
+* No server management
+* Automatic scaling
+* Parallel processing capability
+
+---
+
+## 🗄️ Data Storage Layer (RDS / Aurora)
+
+Structured data is stored in a **relational database (PostgreSQL-compatible)**.
+
+### Stored Data:
+
+* Time-series flow measurements
+* Power consumption values
+* Timestamps and identifiers
+* Dataset metadata
+
+### Benefits:
+
+* Efficient querying and indexing
+* Optimized time-range queries
+* Separation of raw vs structured data
+
+---
+
+## 📊 Visualization Workflow
+
+The system follows a **request-response model**:
+
+1. User requests dataset via UI
+2. Request → API Gateway
+3. Routed to Kubernetes backend
+4. Backend queries database
+5. Data formatted as JSON
+6. Response sent to client
+7. Browser renders charts
+
+> Visualization is isolated from ingestion to avoid performance conflicts.
+
+---
+
+## 🧩 Architectural Principles
+
+* **Separation of Concerns**
+  Upload, processing, storage, and visualization are decoupled
+
+* **Scalability**
+  Kubernetes handles backend scaling, Lambda scales ingestion automatically
+
+* **Fault Isolation**
+  Failures in data processing do not impact the frontend
+
+* **Extensibility**
+  Easy integration of new modules (e.g., ML models)
+
+* **Cloud-Native Design**
+  Managed AWS services reduce operational overhead
+
+---
+
+## 🤖 Future Extension: Machine Learning Integration
+
+The architecture is designed to support ML pipelines such as:
+
+* Sensor calibration models
+* Predictive analytics
+* Anomaly detection
+
+### Integration Point:
+
+ML inference can be inserted between:
+
+```
+Database → Backend → Visualization
+```
+
+This ensures minimal disruption to existing components.
+
+---
+
+## ✅ Summary
+
+This architecture provides a **robust, scalable, and extensible pipeline** for:
+
+* Ingesting CSV-based sensor datasets
+* Processing data using serverless workflows
+* Storing structured time-series data
+* Visualizing insights via a web interface
+
+By combining **Kubernetes, serverless computing, object storage, and relational databases**, the system achieves both **performance and flexibility** for future enhancements.
+
+
 
 # Containerization and Deployment
 
