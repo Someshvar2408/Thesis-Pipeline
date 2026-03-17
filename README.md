@@ -1,4 +1,4 @@
-# Thesis Pipeline - Containerization & Kubernetes Deployment Summary
+# Thesis Pipeline 
 
 ## 🎯 What Has Been Set Up
 
@@ -301,7 +301,7 @@ This section demonstrates a lightweight, interpretable machine learning solution
 
 ## 🏗️ Architecture Diagram
 
-![System Architecture](docs/images/architecture)
+![System Architecture](FutureWork_Thesis.pdf)
 
 ## High-Level Overview
 
