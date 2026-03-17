@@ -301,8 +301,7 @@ This section demonstrates a lightweight, interpretable machine learning solution
 
 ## 🏗️ Architecture Diagram
 
-![System Architecture](FutureWork_Thesis.pdf)
-
+[![View PDF](https://img.shields.io/badge/View-Architecture%20Diagram-blue)](FutureWork_Thesis.pdf)
 ## High-Level Overview
 
 The system is designed as a **scalable, cloud-native data ingestion and visualization pipeline** for time-series sensor and power consumption data.
